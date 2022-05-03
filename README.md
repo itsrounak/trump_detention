@@ -1,3 +1,4 @@
+Rounak Agarwal, Jason Siu and KellY Luo
 # Trump’s Vast Expansion of Child Detention
 
 # What is this about?

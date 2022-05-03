@@ -1,0 +1,364 @@
+---
+title: "Trump’s Vast Expansion of Child Detention"
+author: "Rounak Agarwal, Jason Ching Yuen Siu and Yingqi Luo"
+date: "22/05/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE,error = FALSE)
+```
+
+```{r loading library, include=F,echo = FALSE, results = FALSE,warnings = FALSE}
+library(ggseas)
+library(tidyverse)
+library(lubridate)
+library(naniar)
+library(dplyr)
+library(stopwords)
+library(tidyverse)
+library(tidytext)
+library(textdata)
+library(wordcloud2)
+```
+
+```{r Read the file,include=T,echo = FALSE, results = FALSE,warnings = FALSE}
+df_detention <- read.csv(file = '/Users/rounakagarwal/Desktop/etc1010_M3/detention_clean.csv')
+glimpse(df_detention)
+```
+
+
+
+![A Department of Homeland Security inspection report shows overcrowding of families on June 11, 2019, at the Weslaco, Texas, Border Patrol station. OFFICE OF INSPECTOR GENERAL/DEPARTMENT OF HOMELAND SECURITY VIA GETTY IMAGES](/Users/rounakagarwal/Desktop/ETC1010_M3/images/1200x.jpeg){width=65%}
+
+
+$$\\[1in]$$
+
+
+#### - When U.S. Customs and Border Protection holds migrant children in custody, the child’s detention is supposed to be safe and short. That’s true whether the child is with a parent or without one.  
+
+#### - But new data shows that over the last four years, detention times lengthened as the number of children held at the border soared to *almost half a million*. The detentions, which include both unaccompanied children and children with their families, peaked last year at over 300,000, with 40 percent held longer than the 72-hour limit set by a patchwork of legislation and a court settlement.  
+$$\\[1in]$$
+
+## Number of people detained for more than 72 hours based on their citizenship
+
+```{r,include=T,echo = FALSE, results = FALSE,warnings = FALSE}
+
+df_detention1 <- df_detention %>% 
+  filter(hours_in_custody > 72) 
+  
+citizenship <- df_detention1 %>%
+  group_by(citizenship) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count)) %>%
+  head(10)
+
+
+ggplot(citizenship, aes(x = reorder(citizenship, -count), y = count)) + geom_bar(stat = "identity", fill = 'darkblue') +theme_minimal()+
+ theme(axis.text.x = element_text(angle = 45,hjust = 1)) + xlab("Countries")+ylab("Count")
+
+
+```
+
+#### - The graph makes it obvious that the situation is very serious with children coming from Guatemala and Honduras compared to other countries. The reason is that they have the highest numbers of illegal detentions,valued 69983 and is 59655 respectively.
+
+$$\\[1in]$$
+
+## Number of children detained for more than 72 hours based on their age category
+
+```{r,include=T,echo = FALSE, results = FALSE,warnings = FALSE}
+
+age_group <- df_detention1 %>% 
+  group_by(age_group) %>%
+  summarise(count = n()) %>%
+arrange(desc(count))
+
+
+ggplot(age_group, aes(x = reorder(age_group, -count), y = count)) + geom_bar(stat = "identity", fill = 'darkblue') +theme_minimal() + xlab("Age group")+ylab("Count")
+  
+
+```
+
+#### - Besides the citizenship, we pay attention to the age group of detained children. It is a shock that there are 
+  - *almost 50000* 15-18 years teenagers detained more than 72 hours 
+  - *almost 30000* 3-5 year-old children detained for an illegal time, which is almost twice as 15-18 years age group.
+
+#### - It is even more shcoking to see that children in the age groups of 'Under 1 year', '1-2 years'and '3-5 years' were also detained past the hour limit.
+
+$$\\[1in]$$
+
+
+
+```{r,include=T,echo = FALSE, results = FALSE,warnings = FALSE,message = FALSE}
+df_detention1$gender[df_detention1$gender=="F - FEMALE"] <- "Female" 
+df_detention1$gender[df_detention1$gender=="M - MALE"] <- "Male"
+df_detention1 <- subset(df_detention1, df_detention1$gender !="U - UNKNOWN")
+
+countries <-head(citizenship$citizenship,10) 
+gender = df_detention1%>% group_by(citizenship,gender) %>% summarize(count = n()) %>%
+  filter(citizenship %in% countries )
+
+```
+
+
+
+## Proportion of children detained for more than 72 hours grouped by countries and gender 
+
+```{r,include=T,echo = FALSE, results = FALSE,warnings = FALSE}
+ggplot(gender,
+       aes(x = citizenship,
+           y = count,
+           fill = gender))  +
+  geom_col(position = "fill")+
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1) ) +scale_fill_brewer(palette = "Paired")+ xlab("Countries")+ylab("Count")
+```
+
+#### -From this graph, we can observe that most of the countries are of the similar proportion, except the Indian one. The Indian males weighs more.
+
+$$\\[1in]$$
+
+## Average number of hours detained (more than 72) grouped by countries 
+
+```{r,include=T,echo = FALSE, results = FALSE,warnings = FALSE}
+over_detention<-df_detention %>% 
+  group_by(citizenship) %>% 
+  summarise(hours_custody_ave = mean(hours_in_custody)) %>% 
+  arrange(desc(hours_custody_ave)) %>% 
+  head(10)
+
+over_detention [5,1] = "BURKINA FASO"
+ggplot(over_detention,aes(x=reorder(citizenship,-hours_custody_ave),y=hours_custody_ave))+geom_bar(stat = "identity",fill = "darkblue") +
+  theme_minimal()+ 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1) ) +ylim(0,200)+xlab("Countries")+ylab("Count")
+```
+
+
+#### -Here we get the average hours exceed the 72 hours limit based on top 10 countries.
+#### -It is obvious that most of these 10 countries' average detention hours are around 72 hours and the highest one is 138 hours(TOGO).
+
+$$\\[1in]$$
+
+## Number of people detained against the hours they were detained grouped by year 
+
+```{r,include=T,echo = FALSE, results = FALSE,warnings = FALSE }
+
+df_detention_2017 <- df_detention %>%filter(date_in>as.Date("2017-01-01") & date_in<as.Date("2017-12-31")  )
+df_detention_2018 <- df_detention %>%filter(date_in>as.Date("2018-01-01") & date_in<as.Date("2018-12-31")  )
+df_detention_2019 <- df_detention %>%filter(date_in>as.Date("2019-01-01") & date_in<as.Date("2019-12-31")  )
+
+
+detention_2017 <- df_detention_2017 %>% mutate(hours_in_custody = as.integer(hours_in_custody))%>%group_by(hours_in_custody) %>% summarise(count = n()) 
+detention_2017$year = 2017
+detention_2018 <- df_detention_2018 %>% mutate(hours_in_custody = as.integer(hours_in_custody))%>% group_by(hours_in_custody) %>% summarise(count = n())
+detention_2018$year = 2018
+detention_2019 <- df_detention_2019 %>% mutate(hours_in_custody = as.integer(hours_in_custody))%>% group_by(hours_in_custody) %>% summarise(count = n())
+detention_2019$year = 2019
+
+detention_final = rbind(detention_2017,detention_2018,detention_2019) 
+
+
+ggplot(detention_final,aes(x = hours_in_custody,y = count,color = year))+geom_bar(stat = "identity") + geom_vline(xintercept=72, color = "red", size=1, linetype="dashed")+xlab("Hours detained")+ylab("Count")+theme_minimal()+ geom_text(data=detention_final, aes( x=65, y=7800, label="72 hours"),color="red",size=7 , angle=90, fontface="bold" )
+
+
+```
+
+#### -Over the course of the administration more and more numbers of children were being held in custody at the border, and they spent longer times there. At its peak in 2019, 40 percent of child detentions were 72 hours or longer.
+
+$$\\[1in]$$
+
+## Number of people detained over time
+
+```{r,include=T,echo = FALSE, results = FALSE,warnings = FALSE}
+
+detention_count <- df_detention %>% filter(hours_in_custody >72)%>%group_by(date_in) %>% summarise(count = n())
+
+detention_count$date_in <- as.Date(ymd_hms(detention_count$date_in))
+
+ggplot(detention_count,aes(x = date_in, y = count)) +
+  geom_bar(stat="identity", colour="darkblue")+ 
+           theme(plot.title = element_text(lineheight=.8, face="bold", 
+                                          size = 20))+xlab("Date")+ylab("Count")+theme_minimal()
+
+```
+
+
+#### -The rising numbers of children detained at the border with one or more family members have received relatively little attention. Yet, at the same time, government data shows that detentions of unaccompanied minors were skyrocketing. Likewise, so were detentions of children who arrived with families.
+
+#### -For unaccompanied children, a legal 72-hour limit is set on their initial custody in Customs and Border Protection by the 2008 Trafficking Victims Protection Reauthorization Act. For children who arrive with family members, the same limit is technically required by a 1997 settlement agreement known as Flores—unless there is an influx of minors, defined at the time as 130 children at the border. With the U.S. today routinely detaining thousands of children on a given day, the 72-hour Flores protection for children arriving with parents has not applied for years.Regardless, together these documents require the federal government to provide basic standards of care for all children—like hot meals, fresh water, and clean clothes.
+
+#### -With a growing number of children seeking refuge in the U.S., the policies led to a pile-up of children in border detention centers that were never designed to care for them.
+
+$$\\[1in]$$
+
+## The detention pattern before the news came out
+
+```{r,include=T,echo = FALSE, results = FALSE,warnings = FALSE,message = FALSE}
+# Now if we look more closely just before the news broke out on 4 may 2019 
+count_before <- detention_count %>% filter(date_in <= '2019-05-04' )
+qplot(count_before$date_in,count_before$count, geom='smooth', span =1)+ 
+           theme(plot.title = element_text(lineheight=.8, face="bold", 
+                                          size = 20))+xlab("Date")+ylab("Rate")+theme_minimal()
+```
+
+#### -The number of illegal detentions were increasing at a very high rate and the welfare of children in Border Patrol custody has been the subject of intense scrutiny. This continued till 4 th of may which we can see from the graph above depicting the rate at which the detention increased over the years.
+
+#### -On 4th of May an article was published which caused a huge pressure on the Trump government based on the sentiments of the people of US.
+#### -Here we are going to analyze the sentiments of people based on the comments they made on one of such posts on Reddit.
+
+$$\\[1in]$$
+
+```{r}
+df_reddit <- read.csv(file = '/Users/rounakagarwal/Desktop/etc1010_M3/reddit_clean.csv')
+```
+
+
+Tokenising text
+```{r tokenising}
+comment_df <- tibble(line = seq_along(df_reddit$comment), text = df_reddit$comment)
+
+comment_df <- comment_df %>%
+  unnest_tokens(
+    output = word,
+    input = text,
+    token = "ngrams",
+    n = 1
+  )
+```
+
+Check the stopword 
+```{r}
+stopword <-  stop_words  %>% select(word)
+```
+Remove the stop words with an anti join from `dplyr`
+```{r}
+comment_df <-comment_df %>% anti_join(stopword) 
+impo_word <- comment_df
+```
+
+
+
+
+
+
+```{r, include=T,echo = FALSE, results = FALSE,warnings = FALSE}
+# If you're asked if you want to download the database, please select yes, option 1.
+afinn <- get_sentiments("afinn") # numeric  
+afinn %>% filter(value == 5)  # example of very positive words. Have a go at changing the 5 to other numbers negative or positive and see what you get)
+
+bing <- get_sentiments("bing") # categorical
+
+nrc <- get_sentiments("nrc") 
+```
+
+```{r df-for-sentiment,include=T,echo = FALSE, results = FALSE,warnings = FALSE,message = FALSE}
+num_comment_df <-  comment_df%>% 
+  left_join(afinn) %>% arrange(value) 
+
+cate_comment_df <-  comment_df%>% 
+  left_join(bing) %>% arrange(sentiment)
+nrc_comment_df <-  comment_df%>% 
+  left_join(nrc) 
+
+num_comment_df <- num_comment_df%>% group_by(value) %>% summarise(emotion = n())
+cate_comment_df <- cate_comment_df %>% group_by(sentiment) %>% summarise(Count = n())
+nrc_comment_df <- nrc_comment_df %>% group_by(sentiment) %>% summarise(Count = n()) %>% arrange(desc(Count))
+nrc_comment_df <- nrc_comment_df[c(4:11),]
+#factorise the sentiments
+nrc_comment_df$sentiment <-  as.factor(nrc_comment_df$sentiment)
+cate_comment_df$sentiment <- as.factor(cate_comment_df$sentiment)
+#Convert First letter 
+nrc_comment_df$sentiment <- str_to_title(nrc_comment_df$sentiment) 
+cate_comment_df$sentiment <- str_to_title(cate_comment_df$sentiment) 
+
+cate_comment_df[3,1] = "NA"
+
+```
+
+
+## Sentiment of the comment on the news about detention
+
+```{r visualise-sentiment,include=T,echo = FALSE, results = FALSE,warnings = FALSE}
+p <- ggplot(cate_comment_df, 
+            aes(fct_reorder( sentiment, Count),  Count))+
+         geom_col(fill = "darkblue")+  
+        theme_minimal()+
+         theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.3))+
+  labs(x = "Sentiment")
+p
+```
+
+
+#### -The Redditors do not hold the view positively, in fact rather negatively.It can be seen that NA hold the most the sentiment. 
+
+####  - The reasons could be that : 
+####     1. People are neutral stance and hold neither of the sentiments.
+####     2. Some words cannot be converted to sentiments.
+  
+$$\\[1in]$$
+  
+
+
+## Emotions of the comment on the news about detention
+```{r visualise-emotion,include=T,echo = FALSE, results = FALSE,warnings = FALSE}
+p <- ggplot(nrc_comment_df, aes(fct_reorder( sentiment, Count),  Count))+
+         geom_col(fill = "darkblue")+ 
+        theme_minimal()+
+         theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=0.3))+
+  labs(x = "Sentiment")
+p
+```
+
+
+#### -People are rather fearful on the issues. Most of the people are of negative emotions, like angry.
+
+$$\\[1in]$$
+
+## What are the most important keywords linked to the post? 
+```{r warnings = FALSE}
+impo_word <- impo_word %>% count(word, sort= T)
+```
+
+```{r word-cloud}
+
+wordcloud2(data = impo_word, color = "random-dark")
+```
+
+#### - The redditors concern about the word related to "People" like "Children", "Family""kids", "Migrants", "Seekers", and "Refugees" .
+
+#### - People care words about "security" like "asylum", "camps", "Home", "Wall"., perhaps are rather empathetic.
+
+#### - Also, a lot of words are about politics, like "trump", "country", "government", "money"
+
+$$\\[1in]$$
+
+## The detention pattern after the news
+```{r,include=T,echo = FALSE, results = FALSE,warnings = FALSE,message = FALSE}
+count_after <- detention_count %>% filter(date_in > '2019-05-04' )
+qplot(count_after$date_in,count_after$count, geom='smooth', span =0.5)+ 
+           theme(plot.title = element_text(lineheight=.8, face="bold", 
+                                          size = 20))+xlab("Date")+ylab("Rate")+theme_minimal()
+```
+
+#### -Due to extreme pressure from the journalists and the citizens, the trump government had to take actions to reduce these illegal detentions.
+#### -We also noticed that there were a few category of children were targetted, mainly the clindren in age group '15-18 years' and the citizens of Guatemala  and Honduras. We could also infer from the graph that altough for almost all the countries the gender propotion was somewhat similar there was a drastic difference for the Indian children and lastly the detention count per year was increasing at sturn rate untill people got to know about this which pressureized the government to decrease these illegal detention.
+
+
+$$\\[1in]$$
+
+### We as a team feel that news agencies such as The Marshall project should really get everyone's support. It has made a difference in the lives of these children and stopped the govenrnment to perform these illegal detentions.
+
+### The Marshall Project is a nonpartisan, nonprofit news organization that seeks to create and sustain a sense of national urgency.They have an impact on the system through journalism, rendering it more fair, effective, transparent and humane.
+
+
+#### This QR code will redirect you directly to their donation page,where you can also make a difference by taking a part in their cause.
+
+
+![SCAN ME](/Users/rounakagarwal/Desktop/ETC1010_M3/images/qr-code.png){width=50%}
+
+
+Refrence: (n.d.). Trump Detained More Migrant Children At The Border For Far Longer Than We Knew | The Marshall Project. Retrieved from https://www.themarshallproject.org/2020/10/30/500-000-kids-30-million-hours-trump-s-vast-expansion-of-child-detention
+
+
+
+

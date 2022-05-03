@@ -1,0 +1,171 @@
+---
+title: "cleaning_data"
+author: "Rounak,Jason and Yingqi"
+date: "09/05/2021"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r loading library}
+library(tidyverse)
+library(lubridate)
+library(naniar)
+library(dplyr)
+library(tidytext)
+```
+
+```{r Read the file}
+df_detention <- read.csv(file = "/detention_original.csv")
+glimpse(df_detention)
+```
+
+```{r check the missing values}
+miss_var_summary(df_detention)
+```
+Since app_date and field_office have a lot of missing values we will delete those columns and, We will also remove border, sector and source as we will not be using it.
+
+```{r Removing unnecessary columns}
+df_detention <- subset(df_detention, select = -c(field_office, app_date,border,sector,source))
+miss_var_summary(df_detention)
+
+```
+
+
+We can delete rows where both date_in and date_out are missing
+
+```{r deleting rows where both date_in and date_out are missing}
+df_detention = df_detention[rowSums(is.na(df_detention[c("date_in", "date_out")])) != 2, ]
+miss_var_summary(df_detention)
+```
+
+We notice that there was only one row where both day_in and day_out was missing
+
+Now we delete the rows where either both day_in and hours_in_custody are missing or day_out and hours_in_custody are missing.
+```{r deleting all rows where it is not possible to get either of the dates or hours of custody}
+df_detention = df_detention[rowSums(is.na(df_detention[c("date_in", "hours_in_custody")])) != 2, ]
+df_detention = df_detention[rowSums(is.na(df_detention[c("date_out", "hours_in_custody")])) != 2, ]
+miss_var_summary(df_detention)
+```
+
+we can calculate the hours_in_custody from day_in and day_out
+```{r getting all the values of hours in custody from the dates}
+df_detention$date_in = ymd_hms(df_detention$date_in )
+df_detention$date_out = ymd_hms(df_detention$date_out)
+
+
+for(i in 1:nrow(df_detention)) {  
+  if(is.na(df_detention$hours_in_custody[i])){
+    df_detention$hours_in_custody[i] = as.numeric(difftime(df_detention$date_out[i], df_detention$date_in[i], units = "hours"))
+
+  }
+}
+
+miss_var_summary(df_detention)
+```
+
+
+Since we have hours in custody and date in, we can find the missing values of date_out
+
+```{r getting the remaining dates from hours of custody}
+for(i in 1:nrow(df_detention)) {  
+  if(is.na(df_detention$date_out[i])){
+    hr = hours(as.integer(df_detention$hours_in_custody[i]))
+    df_detention$date_out[i] = df_detention$date_in[i] + hr
+  }
+}
+
+miss_var_summary(df_detention)
+```
+
+
+We will remove the rows where gender and age_group is not available.
+```{r removing the rows where gender and age_group is not available}
+df_detention <- na.omit(df_detention)
+miss_var_summary(df_detention)
+```
+
+
+```{r Remove the outliers and the negative values for hours_in_custody}
+
+df_detention <- df_detention %>%
+  filter(df_detention$hours_in_custody > 0)
+
+#find Q1, Q3, and interquartile range for values in column A
+Q1 <- quantile(df_detention$hours_in_custody , .25)
+Q3 <- quantile(df_detention$hours_in_custody , .75)
+IQR <- IQR(df_detention$hours_in_custody)
+
+#only keep rows in dataframe that have values within 1.5*IQR of Q1 and Q3
+df_detention <- subset(df_detention, df_detention$hours_in_custody> (Q1 - 1.5*IQR) & df_detention$hours_in_custody< (Q3 + 1.5*IQR))
+
+
+summary(df_detention$hours_in_custody)
+```
+
+
+```{r saving df_detention as a csv file}
+write.csv(df_detention,'detention_clean.csv')
+```
+
+
+reading the second dataset
+```{r reding reddit dataset}
+df_reddit <- read.csv(file = "/reddit_original.csv")
+```
+
+select the needed columns
+```{r remove the unnecessary columns}
+df_reddit <-  df_reddit %>%  select(comment)
+```
+
+Remove the deleted and removed comments 
+```{r the unnecessary rows}
+df_reddit <-  df_reddit %>%  filter(comment !="[deleted]" & comment !="[removed]")
+```
+
+Since there are some peculiar signs, this is to remove them
+```{r remove rows with unwanted coments}
+
+
+df_reddit$comment = str_remove(df_reddit$comment, "&amp;")
+df_reddit$comment = str_remove(df_reddit$comment, "#")
+df_reddit$comment = str_remove(df_reddit$comment, "'")
+df_reddit$comment = str_remove(df_reddit$comment, "&gt;")
+df_reddit$comment = str_replace(df_reddit$comment, "\n"," ")
+
+```
+
+Tokenising text
+```{r tokenising}
+comment_df <- tibble(line = seq_along(df_reddit$comment), text = df_reddit$comment)
+
+comment_df <- comment_df %>%
+  unnest_tokens(
+    output = word,
+    input = text,
+    token = "ngrams",
+    n = 1
+  )
+```
+
+Check the stopword 
+```{r stopword check}
+stopword <-  stop_words  %>% select(word)
+```
+
+Remove the stop words with an anti join from `dplyr`
+```{r removing stop words}
+comment_df <-comment_df %>% anti_join(stopword) 
+```
+
+
+```{r saving df_reddit as a csv file }
+write.csv(df_reddit,'reddit_clean.csv')
+```
+
